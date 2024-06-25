@@ -10,6 +10,18 @@ api_key = ''
 url = 'https://api.pixai.art/graphql'
 
 
+def handler(request_text):
+    if 'errors' in request_text:
+        print('message:%s' % request_text['errors'][0]['message'])
+        print('loc:%s' % request_text['errors'][0]['locations'])
+        if 'path' in request_text['errors'][0]:
+            print('path:%s' % request_text['errors'][0]['path'])
+        print('extension code:%s' % request_text['errors'][0]['extensions']['code'])
+        if 'data' in request_text:
+            print('returned data:%s' % request_text['data'])
+    raise ConnectionError('Error accursed when handling the request')
+
+
 def gen_pic(parameter):
     """
     generate pics
@@ -35,12 +47,14 @@ mutation createGenerationTask($parameters: JSONObject!) {
     },
                          headers=headers)
     print(data.text)
+    handler(data.text)
     return json.loads(data.text)
 
 
 def get_pic_mediaid(taskId):
     """
-    get mediaid of the tasks
+    get mediaids of the tasks
+    15 to 25 seconds are recommended to wait for the pics to be generated
     :param taskId: the post_data of gen_pic or post_data['data']['createGenerationTask']['id']
     :return: got mediaid
     """
@@ -65,14 +79,15 @@ task(id: $id) {
     }
     data = requests.post(url, headers=headers, json=getpic_data)
     print(data.text)
-    mediaid = []
+    handler(data.text)
+    mediaid_list = []
     output = json.loads(data.text)['data']['task']['outputs']
     if 'batch' in output:
         for i in output['batch']:
-            mediaid.append(i['mediaId'])
+            mediaid_list.append(i['mediaId'])
     else:
-        mediaid.append(output['mediaId'])
-    return mediaid
+        mediaid_list.append(output['mediaId'])
+    return mediaid_list
 
 
 def get_pic(mediaId):
@@ -102,6 +117,8 @@ query getMediaById($id: String!) {
                 }
             }
             data = requests.post(url, headers=headers, json=query)
+            print(data.text)
+            handler(data.text)
             urlpic = json.loads(data.text)['data']['media']['urls'][0]['url']
             imgresponse = requests.get(urlpic)
             img_data = imgresponse.content
@@ -144,15 +161,13 @@ def format_tag(prompt="1girl",
     if lora is None:
         lora = {}
     model_list = {('AnythingV5', "1648918115270508582"): "1648918115270508582"}
-    samplingmethod_list = ['Euler a', 'Euler', 'DDIM', 'LMS','Restart']
+    samplingmethod_list = ['Euler a', 'Euler', 'DDIM', 'LMS', 'Restart']
     if samplingMethod not in samplingmethod_list:
         samplingMethod = 'Euler a'
         print('WARNING: wrong sampling method\nUsing default Euler a')
     for models in model_list.keys():
         if model in models:
             model = model_list.values()[model_list.keys().index(models)]
-
-
 
     gendata = {
         "prompts": prompt,
