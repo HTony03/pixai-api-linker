@@ -1,15 +1,3 @@
-# Pixai_api_linker
-A small program to connect to `pixai api` 
-
-### future features
-- [X] A pypi package with the basic features
-- [ ] other possible features
-
-### current features
-- [x] link to api & generate/get pictures
-
-### example code
-```python
 from pixai_openapi import *
 import time
 
@@ -39,11 +27,9 @@ genpic_data = gen_pic({
     "height": 768,
     "batchSize": 4,
     "lora": {
-        "More details": 1632808153143363282,
+        "More details": "1632808153143363282",
         "Giantess/Size Difference, Sizeplay Concept LoRA by SaRrow": 1664117894070404490
     }
 })
-time.sleep(25)
+time.sleep(15)
 get_pic(get_pic_mediaid(genpic_data))
-
-```

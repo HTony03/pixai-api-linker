@@ -8,13 +8,13 @@ here = os.path.abspath(os.path.dirname(__file__))
 with codecs.open(os.path.join(here, "README.md"), encoding="utf-8") as fh:
     long_description = "\n" + fh.read()
 
-VERSION = 'v0.0.1'
+VERSION = 'v0.0.2'
 DESCRIPTION = ''
 LONG_DESCRIPTION = ''
 
 # Setting up
 setup(
-    name="pixai-api",
+    name="pixai_openapi",
     version=VERSION,
     author="HTony03",
     author_email="HTony03@foxmail.com",
@@ -22,7 +22,10 @@ setup(
     long_description_content_type="text/markdown",
     long_description=long_description,
     packages=find_packages(),
-    install_requires=[],
+    install_requires=[
+        'requests>=2.32.3',
+        'pillow>=10.3.0',
+    ],
     keywords=["python"],
     classifiers=[
         "Development Status :: 1 - Planning",

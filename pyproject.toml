@@ -1,6 +1,6 @@
 [project]
-name = "pixai-api"
-version = "v0.0.1"
+name = "pixai_openapi"
+version = "v0.0.2"
 authors = [
   { name="HTony03", email="HTony03@foxmail.com" },
 ]
