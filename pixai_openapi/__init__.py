@@ -3,12 +3,35 @@ from io import BytesIO
 from PIL import Image
 import json
 import time
+import configparser
+import os
+import pkg_resources
+from cryptography.fernet import Fernet
 from requests.exceptions import *
 
 _api_key = ''
 _url = 'https://api.pixai.art/graphql'
-# TODO: download custome & choose the quality of pics to download
+_cipher_suite = Fernet(b'Z29fYW5kX3VzZV9waXhhaV9hcGkgICAgICAgICAgICA=')
+# TODO: costom download & choose the quality of pics to download
 
+
+def load_apikey():
+    global _api_key
+    package_dir = pkg_resources.get_distribution('pixai_openapi').location
+    # Construct the file path
+    file_path = os.path.join(package_dir, 'api_key.cfg')
+
+    # Create a ConfigParser object
+    config = configparser.ConfigParser()
+
+    if os.path.exists(file_path):
+        config.read(file_path)
+        encrypted_api_key = config['DEFAULT']['api_key']
+        _api_key = _cipher_suite.decrypt(encrypted_api_key.encode()).decode()
+    else:
+        print('Caution! the api key is not defined yet!')
+
+load_apikey()
 
 def handler(request_text):
     """
@@ -26,7 +49,10 @@ def handler(request_text):
         print('extension code:%s' % request_text['errors'][0]['extensions']['code'])
         if 'data' in request_text:
             print('returned data:%s' % request_text['data'])
-        raise ConnectionError('Error accursed when handling the request')
+        raise ConnectionError('Error occurred when handling the request')
+    if 'message' in json.loads(request_text):
+        print("message:%s,code:%s" % (json.loads(request_text)['message'], json.loads(request_text)['code']))
+        raise ConnectionError('Error occurred when handling the request')
 
 
 def gen_pic(parameter):
@@ -80,6 +106,8 @@ def get_pic_mediaid(taskId):
     :return: A list of media IDs
     """
     try:
+        if not taskId:
+            return 0
         if 'data' in taskId:
             taskId = taskId['data']['createGenerationTask']['id']
 
@@ -166,10 +194,13 @@ def get_pic(mediaId):
                 img = Image.open(img_io)
                 # Show the image
                 # img.show()
-                img.save('%s.jpg' % (str(mediaId.index(id)) + ("%02d_%02d_%02d"
-                                                               % (time.localtime().tm_hour,
-                                                                  time.localtime().tm_min,
-                                                                  time.localtime().tm_sec))))
+                img.save('%s.jpg' % (str(mediaId.index(id)) + ("%04d.%02d.%02d_%02d_%02d_%02d"
+                                             % (time.localtime().tm_year,
+                                                time.localtime().tm_mon,
+                                                time.localtime().tm_mday,
+                                                time.localtime().tm_hour,
+                                                time.localtime().tm_min,
+                                                time.localtime().tm_sec))))
             except ConnectionResetError as E:
                 print("Connection was forcibly closed by the remote host:")
                 print(E)
@@ -208,8 +239,11 @@ def get_pic(mediaId):
             img = Image.open(img_io)
             # Show the image
             # img.show()
-            img.save('%s.jpg' % ("single" + ("%02d_%02d_%02d"
-                                             % (time.localtime().tm_hour,
+            img.save('%s.jpg' % ("single" + ("%04d.%02d.%02d_%02d_%02d_%02d"
+                                             % (time.localtime().tm_year,
+                                                time.localtime().tm_mon,
+                                                time.localtime().tm_mday,
+                                                time.localtime().tm_hour,
                                                 time.localtime().tm_min,
                                                 time.localtime().tm_sec))))
         except ConnectionResetError as E:
@@ -229,6 +263,21 @@ def define_apikey(apikey):
     # TODO:save apikey in storage
     global _api_key
     _api_key = apikey
+
+    package_dir = pkg_resources.get_distribution('pixai_openapi').location
+    # Construct the file path
+    file_path = os.path.join(package_dir, 'api_key.cfg')
+
+    # Create a ConfigParser object
+    config = configparser.ConfigParser()
+
+    encrypted_api_key = _cipher_suite.encrypt(_api_key.encode())
+
+    # Set the API key in the ConfigParser object
+    config['DEFAULT'] = {'Api_Key': encrypted_api_key.decode()}
+    with open(file_path, 'w') as file:
+        config.write(file)
+    return 0
     try:
         headers = {
             'Content-Type': 'application/json',
