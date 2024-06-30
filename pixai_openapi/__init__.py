@@ -12,6 +12,10 @@ from requests.exceptions import *
 _api_key = ''
 _url = 'https://api.pixai.art/graphql'
 _cipher_suite = Fernet(b'Z29fYW5kX3VzZV9waXhhaV9hcGkgICAgICAgICAgICA=')
+save_img = True
+save_quality = 'PUBLIC'
+save_allpic_when_batching = False
+
 # TODO: costom download & choose the quality of pics to download
 
 
@@ -28,10 +32,12 @@ def load_apikey():
         config.read(file_path)
         encrypted_api_key = config['DEFAULT']['api_key']
         _api_key = _cipher_suite.decrypt(encrypted_api_key.encode()).decode()
-    else:
+    if _api_key == '':
         print('Caution! the api key is not defined yet!')
 
+
 load_apikey()
+
 
 def handler(request_text):
     """
@@ -96,20 +102,20 @@ def gen_pic(parameter):
         print(E)
 
 
-def get_pic_mediaid(taskId):
+def get_pic_mediaid(task_id):
     """
     Gets the media IDs of the tasks.
     Sends a POST request to the API with the task ID and handles the response.
     15 to 25 seconds are recommended to wait for the pics to be generated
 
-    :param taskId: the response of @gen_pic or response['data']['createGenerationTask']['id']
+    :param task_id: the response of @gen_pic or response['data']['createGenerationTask']['id']
     :return: A list of media IDs
     """
     try:
-        if not taskId:
+        if not task_id:
             return 0
-        if 'data' in taskId:
-            taskId = taskId['data']['createGenerationTask']['id']
+        if 'data' in task_id:
+            task_id = task_id['data']['createGenerationTask']['id']
 
         headers = {
             'Content-Type': 'application/json',
@@ -124,7 +130,7 @@ def get_pic_mediaid(taskId):
     }
     """,
             'variables': {
-                'id': str(taskId)
+                'id': str(task_id)
             }
         }
         data = requests.post(_url, headers=headers, json=getpic_data)
@@ -152,20 +158,20 @@ def get_pic_mediaid(taskId):
         print(E)
 
 
-def get_pic(mediaId):
+def get_pic(media_id):
     """
     Gets the pictures from the media IDs.
     Sends a POST request to the API with the media ID and handles the response.
 
-    :param mediaId: The media ID from @get_pic_mediaid
+    :param media_id: The media ID from @get_pic_mediaid
     :return: The pictures(auto_save)
     """
     headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + _api_key
     }
-    if type(mediaId) == type([]):
-        for id in mediaId:
+    if isinstance([], type([])):
+        for id_media in media_id:
             try:
                 query = {
                     'query': """
@@ -178,13 +184,20 @@ def get_pic(mediaId):
         }
     }""",
                     'variables': {
-                        'id': str(id)
+                        'id': str(id_media)
                     }
                 }
                 data = requests.post(_url, headers=headers, json=query)
                 print(data.text)
                 handler(data.text)
-                urlpic = json.loads(data.text)['data']['media']['urls'][0]['url']
+                urls = json.loads(data.text)['data']['media']['urls']# [0]['url']
+                urlpic = ''
+                for i in urls:
+                    if i['variant'] == save_quality:
+                        urlpic = i['url']
+                if not urlpic:
+                    raise ValueError('the quality of pic not found')
+
                 time.sleep(1)
                 imgresponse = requests.get(urlpic)
                 img_data = imgresponse.content
@@ -194,21 +207,22 @@ def get_pic(mediaId):
                 img = Image.open(img_io)
                 # Show the image
                 # img.show()
-                img.save('%s.jpg' % (str(mediaId.index(id)) + ("%04d.%02d.%02d_%02d_%02d_%02d"
-                                             % (time.localtime().tm_year,
-                                                time.localtime().tm_mon,
-                                                time.localtime().tm_mday,
-                                                time.localtime().tm_hour,
-                                                time.localtime().tm_min,
-                                                time.localtime().tm_sec))))
+                img.save('%s.jpg' % (("%04d.%02d.%02d_%02d_%02d_%02d_"
+                                      % (time.localtime().tm_year,
+                                         time.localtime().tm_mon,
+                                         time.localtime().tm_mday,
+                                         time.localtime().tm_hour,
+                                         time.localtime().tm_min,
+                                         time.localtime().tm_sec))
+                                     + str(media_id.index(id_media))))
             except ConnectionResetError as E:
                 print("Connection was forcibly closed by the remote host:")
                 print(E)
             except ConnectionError as E:
                 print("Connection Error:")
                 print(E)
-    elif type(mediaId) == type('') or type(mediaId) == type(0):
-        if mediaId == 0 or mediaId == '0':
+    elif isinstance(media_id, type('')) or isinstance(media_id, type(0)):
+        if media_id == 0 or media_id == '0':
             return 0
 
         try:
@@ -223,13 +237,20 @@ def get_pic(mediaId):
             }
         }""",
                 'variables': {
-                    'id': str(mediaId)
+                    'id': str(media_id)
                 }
             }
             data = requests.post(_url, headers=headers, json=query)
             print(data.text)
             handler(data.text)
-            urlpic = json.loads(data.text)['data']['media']['urls'][0]['url']
+            urls = json.loads(data.text)['data']['media']['urls']  # [0]['url']
+            urlpic = ''
+            for i in urls:
+                if i['variant'] == save_quality:
+                    urlpic = i['url']
+            if not urlpic:
+                raise ValueError('the quality of pic not found')
+
             time.sleep(1)
             imgresponse = requests.get(urlpic)
             img_data = imgresponse.content
@@ -239,13 +260,13 @@ def get_pic(mediaId):
             img = Image.open(img_io)
             # Show the image
             # img.show()
-            img.save('%s.jpg' % ("single" + ("%04d.%02d.%02d_%02d_%02d_%02d"
-                                             % (time.localtime().tm_year,
-                                                time.localtime().tm_mon,
-                                                time.localtime().tm_mday,
-                                                time.localtime().tm_hour,
-                                                time.localtime().tm_min,
-                                                time.localtime().tm_sec))))
+            img.save('%s.jpg' % (("%04d.%02d.%02d_%02d_%02d_%02d"
+                                  % (time.localtime().tm_year,
+                                     time.localtime().tm_mon,
+                                     time.localtime().tm_mday,
+                                     time.localtime().tm_hour,
+                                     time.localtime().tm_min,
+                                     time.localtime().tm_sec)) + "_single"))
         except ConnectionResetError as E:
             print("Connection was forcibly closed by the remote host:")
             print(E)
@@ -260,13 +281,12 @@ def define_apikey(apikey):
 
     :param apikey: The API key.
     """
-    # TODO:save apikey in storage
     global _api_key
     _api_key = apikey
 
     package_dir = pkg_resources.get_distribution('pixai_openapi').location
     # Construct the file path
-    file_path = os.path.join(package_dir, 'api_key.cfg')
+    file_path = os.path.join(package_dir, r'.\pixai_openapi\api_key.cfg')
 
     # Create a ConfigParser object
     config = configparser.ConfigParser()
@@ -319,7 +339,7 @@ def define_apikey(apikey):
             print("out:%s,code:%s" % (data_json['message'], data_json['code']))
         else:
             print('successfully changed the api key')
-            print('test generated pic:taskid=%s,est credit:200' 
+            print('test generated pic:taskid=%s,est credit:200'
                   % json.loads(data.text)['data']['createGenerationTask']['id'])
     except ConnectionResetError as E:
         print("Connection was forcibly closed by the remote host:")
@@ -332,9 +352,9 @@ def define_apikey(apikey):
 def format_tag(prompt="1girl",
                model='AnythingV5',
                negativeprompt='(worst quality, low quality, large head, extra digits:1.4), easynegative,',
-               samplingSteps=12,
-               samplingMethod="Euler a",
-               cfgScale=5,
+               sampling_steps=12,
+               sampling_method="Euler a",
+               cfg_scale=5,
                width=512,
                height=768,
                batchSize=1,
@@ -348,15 +368,15 @@ def format_tag(prompt="1girl",
         :type model:str,the ver num of the model or the name (only covers some models,maybe not in database)
         :param negativeprompt: The negative prompt for the picture generation.
         :type negativeprompt:str
-        :param samplingSteps: The number of sampling steps.
-        :type samplingSteps:int
-        :param samplingMethod: The sampling method to be used.
-        :type samplingMethod:str,list following:
+        :param sampling_steps: The number of sampling steps.
+        :type sampling_steps:int
+        :param sampling_method: The sampling method to be used.
+        :type sampling_method:str,list following:
         ['Euler a', 'Euler', 'DDIM', 'LMS', 'Restart', 'Heun', 'DPM2 Karras',
        'DPM2 a Karras', 'DPM++ 2M Karras', 'DPM++ 2S a Karras', 'DPM++ SDEMKarras',
        'DPM++ 2M SDEKarras']
-        :param cfgScale: The configuration scale.
-        :type cfgScale:int
+        :param cfg_scale: The configuration scale.
+        :type cfg_scale:int
         :param width: The width of the picture.
         :type width:int
         :param height: The height of the picture.
@@ -381,8 +401,8 @@ def format_tag(prompt="1girl",
     samplingmethod_list = ['Euler a', 'Euler', 'DDIM', 'LMS', 'Restart', 'Heun', 'DPM2 Karras',
                            'DPM2 a Karras', 'DPM++ 2M Karras', 'DPM++ 2S a Karras', 'DPM++ SDEMKarras',
                            'DPM++ 2M SDEKarras']
-    if samplingMethod not in samplingmethod_list:
-        samplingMethod = 'Euler a'
+    if sampling_method not in samplingmethod_list:
+        sampling_method = 'Euler a'
         print('WARNING: wrong sampling method\nUsing default Euler a')
     model_out = None
     for models in list(model_list.keys()):
@@ -400,9 +420,9 @@ def format_tag(prompt="1girl",
         "prompts": prompt,
         "enableTile": False,
         "negativePrompts": negativeprompt,
-        "samplingSteps": samplingSteps,
-        "samplingMethod": samplingMethod,
-        "cfgScale": cfgScale,
+        "samplingSteps": sampling_steps,
+        "sampling_method": sampling_method,
+        "cfgScale": cfg_scale,
         "modelId": model_out,
         "width": width,
         "height": height,
